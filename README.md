@@ -221,6 +221,13 @@ The manual `Lavender iOS 16 test image` Actions workflow publishes the same
 assembly recipe with checked kernel/firmware artifact inputs. Its generated
 ADT entropy means each build has its own image hash.
 
+On the connected phone, Root Fastboot confirmed `product: lavender`, sent
+the 22,577,152-byte local image and returned `Booting OKAY` (0.947 s total).
+The firmware/kernel/root screen is awaiting a photograph. The artifact recipe
+also passed Actions run
+[42364915071](https://github.com/aLpHa-Git-69/UniXNU-lavender/actions/runs/42364915071).
+Fastboot acceptance is recorded separately from kernel/root execution.
+
 Reproduce with local checked inputs:
 
 ```sh

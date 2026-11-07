@@ -28,7 +28,7 @@ PINS = {
     "uefi-lavender": "3b2e7d8ce4dc02bd1cdf66db6421d919410c3a50",
     "UniXNU": "17aaf5262336a6e4bd7f722d168730d22b750725",
     "UniXNU/drivers/DarwinBoot": "6e8900cdca6e69d5426aeecbb6b62ec4e803a327",
-    "ios-lavender": "f9707f0af3c5b3b4f22e7978ef4bc89583886c97",
+    "ios-lavender": "a14adba76ff52eaf38e24bc883db28266d78673f",
     "uefi-lavender/Mu_Basecore": "64f478939955e45faa632c160ae2a75a5ff7ef7f",
     "uefi-lavender/Common/Mu": "566cf5c8c2c8adf8e1a337ced1d147bc6246856f",
     "uefi-lavender/Common/Mu_OEM_Sample": "9292f9254adb94c5e5bb09a370b9662fcd66a953",
