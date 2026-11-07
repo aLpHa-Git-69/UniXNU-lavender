@@ -228,6 +228,19 @@ also passed Actions run
 [42364915071](https://github.com/aLpHa-Git-69/UniXNU-lavender/actions/runs/42364915071).
 Fastboot acceptance is recorded separately from kernel/root execution.
 
+The subsequent `IMG_20261107_162235_595.jpg` shows the green handoff bar and
+loader preparation logs, but no confirmed kernel/root output. It exposed a
+verified bootstrap-bank defect: the old VA `0xfffffe0007004000` / PA
+`0xa0004000` tuple has a 16 MiB phase mismatch for 32 MiB L2 blocks. The
+published loader fix declares VA bank `0xfffffe0006000000`, allocates a
+32 MiB-aligned physical bank, and copies the linked header at offset
+`0x01004000`. For PA bank `0xa0000000`, entry is `0xa14ba488` and arguments
+are `0xa2984000`. The corrected source passes 562 host/ABI/bank/state checks
+and native ARM64 compilation/audits against the actual SHA-matched kernel.
+The earlier image above is the failing baseline; the next FD/image rebuild
+must contain the corrected bank loader. Kernel/root hardware verification
+remains pending.
+
 Reproduce with local checked inputs:
 
 ```sh

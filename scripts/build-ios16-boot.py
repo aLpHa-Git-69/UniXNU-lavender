@@ -48,9 +48,11 @@ def loader_policy_present(fd):
     for kind, section, header in build.sections(inner["1B64AF87-8415-4B57-9B16-680D70913B9F"]):
         if kind == 0x10:
             image = section[header:]
-            if all(name in image for name in (b"darwinboot-args-abi", b"darwinboot-page-size", b"darwinboot-boot-cpu")):
+            bank_marker = "DARWINBOOT: block=0x%lx linked header va=0x%lx".encode("utf-16-le")
+            if (all(name in image for name in (b"darwinboot-args-abi", b"darwinboot-page-size", b"darwinboot-boot-cpu"))
+                    and bank_marker in image):
                 return hashlib.sha256(image).hexdigest()
-    raise ValueError("actual FD has no Darwin 22/Gold policy loader")
+    raise ValueError("actual FD has no coherent Darwin 22/16 KiB bootstrap-bank loader")
 
 
 def main():
@@ -145,6 +147,9 @@ def main():
               "payload_bytes": payload.stat().st_size, "payload_sha256": digest(payload),
               "image_bytes": image.stat().st_size, "image_sha256": digest(image),
               "cpu_affinity": "0x100", "page_bytes": 16384, "owned_memory_bytes": 0x40000000,
+              "bootstrap_block_bytes": 0x2000000,
+              "virtual_bank_base": hex(min(s["vmaddr"] for s in macho["segs"] if s["vmsize"]) & ~0x1ffffff),
+              "linked_header_bank_offset": hex(min(s["vmaddr"] for s in macho["segs"] if s["vmsize"]) & 0x1ffffff),
               "payload_copy_range": ["0x84000000", "0x85400000"], "firmware_sources": fw_report["source_commits"]}
     (out / "build-report.json").write_text(json.dumps(report, indent=2) + "\n")
     (out / "SHA256SUMS").write_text(f"{digest(image)}  {image.name}\n{digest(payload)}  {payload.name}\n")

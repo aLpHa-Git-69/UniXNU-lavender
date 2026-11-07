@@ -26,8 +26,8 @@ import uuid
 ROOT = Path(__file__).resolve().parents[1]
 PINS = {
     "uefi-lavender": "3b2e7d8ce4dc02bd1cdf66db6421d919410c3a50",
-    "UniXNU": "17aaf5262336a6e4bd7f722d168730d22b750725",
-    "UniXNU/drivers/DarwinBoot": "6e8900cdca6e69d5426aeecbb6b62ec4e803a327",
+    "UniXNU": "afca227881b00dd76b7b4b6ce4d16b8a60014483",
+    "UniXNU/drivers/DarwinBoot": "66b68e00ef1a4bb15aaa35a8177b54b72850d921",
     "ios-lavender": "a14adba76ff52eaf38e24bc883db28266d78673f",
     "uefi-lavender/Mu_Basecore": "64f478939955e45faa632c160ae2a75a5ff7ef7f",
     "uefi-lavender/Common/Mu": "566cf5c8c2c8adf8e1a337ced1d147bc6246856f",

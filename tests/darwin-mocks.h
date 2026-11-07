@@ -45,12 +45,20 @@ typedef struct {
   UINT32 ExpectedAbi;
   UINT32 ExpectedPage;
   UINT64 ExpectedWindow;
+  UINT64 ExpectedVirtualBase;
+  KERNEL ExpectedKernel;
+  UINT64 EnteredArgs;
+  UINT64 EnteredEntry;
+  UINT64 EnteredTree;
+  UINT64 EnteredTop;
   UINT64 ExpectedCpu;
   UINT32 ExpectedMethod;
   INT32 InitialAffinity;
   INT32 OnReturn;
   INT32 RunningAffinity;
   EFI_STATUS ContextAllocateStatus;
+  EFI_STATUS WindowAllocateStatus;
+  UINTN WindowAttempts;
   EFI_STATUS ExitStatus;
   BOOLEAN OnDespiteError;
   BOOLEAN NeverReady;
@@ -72,6 +80,8 @@ typedef struct {
   UINT64 PhysicalArgs;
   UINT64 PhysicalEntry;
   UINT8 Kernel[4096];
+  CONST UINT8 *KernelData;
+  UINTN KernelSize;
   UINT8 Tree[8192];
   UINTN TreeSize;
   CHAR16 Command[1100];
@@ -254,6 +264,8 @@ STATIC EFI_STATUS EFIAPI MockAllocatePages (EFI_ALLOCATE_TYPE Type, EFI_MEMORY_T
   assert (Mock.ExitAttempts == 0);
   if (Type == AllocateAddress) {
     assert (MemoryType == EfiLoaderCode && RangeFree (*Address, EFI_PAGES_TO_SIZE (Pages)));
+    Mock.WindowAttempts++;
+    if (EFI_ERROR (Mock.WindowAllocateStatus)) { return Mock.WindowAllocateStatus; }
     Mock.Window = *Address;
     Mock.WindowPages = Pages;
     Mock.WindowAllocations++;
@@ -314,19 +326,62 @@ STATIC EFI_STATUS EFIAPI MockExit (EFI_HANDLE Image, UINTN Key) {
   return EFI_SUCCESS;
 }
 
+STATIC VOID AssertZeroBytes (CONST UINT8 *Data, UINT64 Size) {
+  for (UINT64 I = 0; I < Size; I++) { assert (Data[I] == 0); }
+}
+
+// Decode the kernel's initial L2 descriptors independently of loader helpers.
+STATIC UINT64 BootstrapTranslation (UINT64 Virtual, UINT64 VirtualBase, UINT64 PhysicalBase, UINT32 PageSize) {
+  UINT64 Block = (PageSize == 16384) ? 0x02000000 : 0x00200000;
+  UINT64 Mask = (PageSize == 16384) ? 0x0000fffffe000000ULL : 0x0000ffffffe00000ULL;
+  UINT64 VirtualBank = VirtualBase & ~(Block - 1);
+  UINT64 Descriptor = ((PhysicalBase & Mask) + ((Virtual - VirtualBank) & ~(Block - 1))) | 0x601;
+  return (Descriptor & Mask) | (Virtual & (Block - 1));
+}
+
+STATIC VOID AssertCopiedKernel (UINT64 Memory) {
+  UINT64 Block = (Mock.ExpectedPage == 16384) ? 0x02000000 : 0x00200000;
+  for (UINTN I = 0; I < Mock.ExpectedKernel.Count; I++) {
+    SEGMENT *S = &Mock.ExpectedKernel.Segments[I];
+    UINT64 Physical = Memory + (S->Address - Mock.ExpectedVirtualBase);
+    assert ((S->Address & (Block - 1)) == (Physical & (Block - 1)));
+    assert (CompareMem ((VOID *)(UINTN)Physical, Mock.KernelData + S->FileOffset, S->FileSize) == 0);
+    AssertZeroBytes ((UINT8 *)(UINTN)(Physical + S->FileSize), S->Size - S->FileSize);
+    for (UINT64 V = S->Address; V < S->Address + S->Size;) {
+      assert (BootstrapTranslation (V, Mock.ExpectedVirtualBase, Memory, Mock.ExpectedPage) == Memory + (V - Mock.ExpectedVirtualBase));
+      UINT64 Next = (V & ~(Block - 1)) + Block;
+      if (Next <= V || Next >= S->Address + S->Size) { break; }
+      V = Next;
+    }
+    UINT64 Last = S->Address + S->Size - 1;
+    assert (BootstrapTranslation (Last, Mock.ExpectedVirtualBase, Memory, Mock.ExpectedPage) == Physical + S->Size - 1);
+  }
+  AssertZeroBytes ((UINT8 *)(UINTN)Memory, Mock.ExpectedKernel.Base - Mock.ExpectedVirtualBase);
+}
+
 VOID EFIAPI DarwinEnter (UINT64 Args, UINT64 Entry, UINT64 Memory, UINT64 Size, UINT64 Video, UINT64 VideoBytes, UINT64 Context) {
   UINT64 TreeAddress;
   UINTN ActualOffset = (Mock.ExpectedAbi == 22) ? 0x2d8 : 0x478;
   assert (Mock.Exited && Video == 0 && VideoBytes == 0);
-  assert (Size == Mock.ExpectedWindow && Memory == Mock.Window && Entry == Memory + 0x800);
+  assert (Size == Mock.ExpectedWindow && Memory == Mock.Window);
+  assert (Entry == Memory + (Mock.ExpectedKernel.Entry - Mock.ExpectedVirtualBase));
+  assert (Args == ALIGN_VALUE (Memory + (Mock.ExpectedKernel.End - Mock.ExpectedVirtualBase), SIZE_16KB));
   assert ((Args & (Mock.ExpectedPage - 1)) == 0);
   assert (U64 ((VOID *)(UINTN)(Args + 0x18)) == Size && U64 ((VOID *)(UINTN)(Args + ActualOffset)) == Size);
-  assert (U64 ((VOID *)(UINTN)(Args + 0x08)) == 0xfffffe0007004000ULL);
+  assert (U64 ((VOID *)(UINTN)(Args + 0x08)) == Mock.ExpectedVirtualBase);
   assert (U64 ((VOID *)(UINTN)(Args + 0x10)) == Memory);
-  TreeAddress = U64 ((VOID *)(UINTN)(Args + 0x60)) - 0xfffffe0007004000ULL + Memory;
+  TreeAddress = U64 ((VOID *)(UINTN)(Args + 0x60)) - Mock.ExpectedVirtualBase + Memory;
   assert (TreeAddress == Args + Mock.ExpectedPage && U32 ((VOID *)(UINTN)(Args + 0x68)) == Mock.TreeSize);
   assert (CompareMem ((VOID *)(UINTN)TreeAddress, Mock.Tree, Mock.TreeSize) == 0);
   assert (AsciiStrLen ((CHAR8 *)(UINTN)(Args + 0x6c)) == StrLen (Mock.Command));
+  assert (BootstrapTranslation (Mock.ExpectedVirtualBase + (Args - Memory), Mock.ExpectedVirtualBase, Memory, Mock.ExpectedPage) == Args);
+  assert (BootstrapTranslation (U64 ((VOID *)(UINTN)(Args + 0x60)), Mock.ExpectedVirtualBase, Memory, Mock.ExpectedPage) == TreeAddress);
+  AssertCopiedKernel (Memory);
+  Mock.EnteredArgs = Args;
+  Mock.EnteredEntry = Entry;
+  Mock.EnteredTree = TreeAddress;
+  Mock.EnteredTop = U64 ((VOID *)(UINTN)(Args + 0x20));
+  assert (Mock.EnteredTop <= Memory + Size - SIZE_2MB && Mock.EnteredTop >= TreeAddress + Mock.TreeSize);
   Mock.Enters++;
   if (Mock.ExpectedCpu == (Mock.CurrentCpu & DARWIN_MPIDR_AFFINITY_MASK)) {
     assert (Context == 0 && Mock.OnCalls == 0 && Mock.ContextAllocations == 0);
@@ -378,7 +433,7 @@ STATIC EFI_STATUS EFIAPI MockInfo (EFI_FILE_PROTOCOL *File, EFI_GUID *Guid, UINT
 STATIC EFI_STATUS EFIAPI MockOpen (EFI_FILE_PROTOCOL *Root, EFI_FILE_PROTOCOL **File, CHAR16 *Path, UINT64 Mode, UINT64 Attributes) {
   assert (Root == &MockRoot && Mode == EFI_FILE_MODE_READ && Attributes == 0);
   if (EndsWith (Path, ".adt")) { MockFile.Data = Mock.Tree; MockFile.Size = Mock.TreeSize; }
-  else if (EndsWith (Path, ".macho")) { MockFile.Data = Mock.Kernel; MockFile.Size = sizeof (Mock.Kernel); }
+  else if (EndsWith (Path, ".macho")) { MockFile.Data = Mock.KernelData; MockFile.Size = Mock.KernelSize; }
   else { return EFI_NOT_FOUND; }
   *File = &MockFile.Protocol;
   return EFI_SUCCESS;
@@ -405,7 +460,7 @@ STATIC EFI_STATUS EFIAPI MockLocate (EFI_GUID *Guid, VOID *Registration, VOID **
 STATIC EFI_STATUS EFIAPI MockInstall (EFI_HANDLE *Handle, ...) { assert (Handle != NULL); return EFI_SUCCESS; }
 STATIC EFI_STATUS EFIAPI MockUninstall (EFI_HANDLE Handle, ...) { (VOID)Handle; Mock.Uninstalls++; return EFI_SUCCESS; }
 
-STATIC VOID ResetMock (VOID) {
+STATIC VOID ResetMockAt (UINT64 Hint) {
   UINT64 Start;
   UINTN I;
 
@@ -414,19 +469,21 @@ STATIC VOID ResetMock (VOID) {
   if (Mock.ContextMemory != NULL) { assert (munmap (Mock.ContextMemory, sizeof (DARWIN_CPU_CONTEXT)) == 0); }
   ZeroMem (&Mock, sizeof (Mock));
   ZeroMem (&mCpuHandoff, sizeof (mCpuHandoff));
-  Mock.MemoryBytes = SIZE_1GB + BLOCK_SIZE + SIZE_64KB;
-  Mock.Memory = mmap (NULL, (size_t)Mock.MemoryBytes, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
+  Mock.MemoryBytes = (Hint == 0) ? (SIZE_1GB + SIZE_32MB + SIZE_64KB) : 0x5eac0000;
+  // A hint, never MAP_FIXED: the host test cannot replace an existing mapping.
+  Mock.Memory = mmap ((VOID *)(UINTN)Hint, (size_t)Mock.MemoryBytes, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
   assert (Mock.Memory != MAP_FAILED);
+  assert ((Hint == 0) || ((UINT64)(UINTN)Mock.Memory == Hint));
   // mmap avoids Android's tagged malloc pointers in a physical-address fixture.
   Mock.ContextMemory = mmap (NULL, sizeof (DARWIN_CPU_CONTEXT), PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
   assert (Mock.ContextMemory != MAP_FAILED);
-  Start = ALIGN_VALUE ((UINT64)(UINTN)Mock.Memory, BLOCK_SIZE);
+  Start = ALIGN_VALUE ((UINT64)(UINTN)Mock.Memory, SIZE_32MB);
   Mock.Map[0].Type = EfiConventionalMemory;
   Mock.Map[0].PhysicalStart = Start;
   Mock.Map[0].NumberOfPages = EFI_SIZE_TO_PAGES (SIZE_128MB);
   Mock.Map[1].Type = EfiConventionalMemory;
   Mock.Map[1].PhysicalStart = Start + SIZE_128MB;
-  Mock.Map[1].NumberOfPages = EFI_SIZE_TO_PAGES (SIZE_1GB + SIZE_64KB - SIZE_128MB);
+  Mock.Map[1].NumberOfPages = EFI_SIZE_TO_PAGES (((Hint == 0) ? (SIZE_1GB + SIZE_64KB) : Mock.MemoryBytes) - SIZE_128MB);
   Mock.Map[2].Type = EfiConventionalMemory;
   Mock.Map[2].PhysicalStart = (UINT64)(UINTN)Mock.ContextMemory;
   Mock.Map[2].NumberOfPages = DARWIN_CPU_CONTEXT_PAGES;
@@ -468,5 +525,7 @@ STATIC VOID ResetMock (VOID) {
   assert (DarwinBootEntry ((EFI_HANDLE)(UINTN)1, &MockSystem) == EFI_SUCCESS);
   assert (MockLoaded.Unload == Unload && mLoader.Revision == UNIXNU_LOADER_REVISION);
 }
+
+STATIC VOID ResetMock (VOID) { ResetMockAt (0); }
 
 #endif

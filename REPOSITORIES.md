@@ -4,8 +4,8 @@
 | --- | --- | --- |
 | [UniXNU-lavender](https://github.com/aLpHa-Git-69/UniXNU-lavender) | This board/build workspace, probes and image assembly | Board commit |
 | [uefi-lavender](https://github.com/aLpHa-Git-69/uefi-lavender/tree/lavender) | Mu-Silicium platform, FDT/initrd preservation and reservations | `3b2e7d8ce4dc02bd1cdf66db6421d919410c3a50` |
-| [UniXNU](https://github.com/aLpHa-Git-69/UniXNU/tree/lavender) | Boot manager, RAM filesystem and loader submodule | `17aaf5262336a6e4bd7f722d168730d22b750725` |
-| [DarwinBoot](https://github.com/aLpHa-Git-69/DarwinBoot/tree/lavender) | Darwin 22/23 ABI and PSCI CPU handoff | `6e8900cdca6e69d5426aeecbb6b62ec4e803a327` |
+| [UniXNU](https://github.com/aLpHa-Git-69/UniXNU/tree/lavender) | Boot manager, RAM filesystem and loader submodule | `afca227881b00dd76b7b4b6ce4d16b8a60014483` |
+| [DarwinBoot](https://github.com/aLpHa-Git-69/DarwinBoot/tree/lavender) | Darwin 22/23 ABI, PSCI handoff and coherent 16 KiB bootstrap banks | `66b68e00ef1a4bb15aaa35a8177b54b72850d921` |
 | [ios-lavender](https://github.com/aLpHa-Git-69/ios-lavender/tree/lavender) | Native Darwin 22 kernel, Clover-inspired SDCC/GIC patches, product-ADT input and handoff notes | `a14adba76ff52eaf38e24bc883db28266d78673f` |
 
 The top-level submodule links and `scripts/build-stage1.py` pin the inputs.

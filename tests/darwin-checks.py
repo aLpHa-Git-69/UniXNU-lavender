@@ -118,13 +118,19 @@ def handoff_order_audit(disassembly):
     assert int(re.search(r"0x([0-9a-f]+)", code[park + 1][2])[1], 16) == code[park][0]
 
 
-def verify(output, mde, sanitize):
+def verify(output, mde, sanitize, kernel=None, kernel_sha256=None):
     commands = []
     output.mkdir(parents=True, exist_ok=True)
     env = dict(os.environ, TMPDIR=str(output), PYTHONDONTWRITEBYTECODE="1")
     includes = [f"-I{mde}", f"-I{mde / 'AArch64'}",
                 f"-I{ROOT / 'UniXNU/package/UniXNUPkg/Include'}"]
     try:
+        native = None
+        if kernel:
+            digest = hashlib.sha256(kernel.read_bytes()).hexdigest()
+            if kernel_sha256:
+                assert digest == kernel_sha256.lower(), f"native kernel SHA-256 mismatch: {digest}"
+            native = {"path": str(kernel), "sha256": digest}
         host = output / "darwin-boot-test"
         host_flags = ["-O1", "-g", "-std=gnu11", "-Wall", "-Wextra", "-Werror",
                       "-fno-builtin", "-fshort-wchar", "-DMDEPKG_NDEBUG"]
@@ -132,8 +138,13 @@ def verify(output, mde, sanitize):
             host_flags += ["-fsanitize=undefined", "-fno-sanitize-recover=all"]
         run(["clang", *host_flags, *includes, ROOT / "tests/darwin-boot.c",
              DRIVER / "CpuHandoff.c", "-o", host], commands, env)
-        host_result = run([host], commands, env)
+        host_result = run([host, *([kernel] if kernel else [])], commands, env)
         print(host_result, end="")
+        if native is not None:
+            pattern = r"native bank va=([0-9a-f]+) pa=([0-9a-f]+) header=([0-9a-f]+) entry=([0-9a-f]+) args=([0-9a-f]+) tree=([0-9a-f]+)"
+            keys = ("virtual_base", "physical_base", "header_pa", "entry_pa", "args_pa", "tree_pa")
+            native["verified_banks"] = [{key: "0x" + value for key, value in zip(keys, match)} for match in re.findall(pattern, host_result)]
+            assert len(native["verified_banks"]) == 2
         target = ["--target=aarch64-unknown-windows", "-mcpu=cortex-a53", "-march=armv8-a+crypto",
                   "-mno-outline-atomics", "-mgeneral-regs-only", "-ffreestanding", "-fshort-wchar",
                   "-fno-builtin", "-fno-stack-protector", "-fno-unwind-tables", "-fno-asynchronous-unwind-tables",
@@ -178,14 +189,17 @@ def verify(output, mde, sanitize):
         print(f"PASS: actual C ARM64/COFF objects; {audit['cold_bytes']}-byte cold entry, zero relocations/undefined symbols, stack/global/call-free")
         print("PASS: assembly PE link and ELF cross-compile; zero LSE/RCpc instruction hits")
         for script in ("test-kernel-parser.py", "test-packed-ramdisk.py"):
-            print(run(["python3", DRIVER.parents[1] / "Test" / script], commands, env), end="")
+            extra = [kernel] if kernel and script == "test-kernel-parser.py" else []
+            print(run(["python3", DRIVER.parents[1] / "Test" / script, *extra], commands, env), end="")
         window = output / "window-size-test"
         run(["clang", "-Wall", "-Wextra", "-Werror", DRIVER.parents[1] / "Test/window-size.c", "-o", window], commands, env)
         run([window], commands, env)
-        sources = [DRIVER / name for name in ("BootArgs.h", "BootPolicy.h", "CpuHandoff.h", "CpuHandoff.c", "DarwinBoot.c", "Entry.S", "DarwinBoot.inf")]
+        sources = [DRIVER / name for name in ("BootArgs.h", "BootPolicy.h", "BootstrapBank.h", "WindowSize.h", "CpuHandoff.h", "CpuHandoff.c", "DarwinBoot.c", "Entry.S", "DarwinBoot.inf")]
+        sources += [ROOT / "tests" / name for name in ("darwin-boot.c", "darwin-mocks.h", "darwin-checks.py")]
         report = {"host_result": host_result, "ubsan": sanitize, "compiler": run(["clang", "--version"], commands, env).splitlines()[0],
                   "mde_include": str(mde), "arm64_audit": audit, "pe_link_scope": "production Entry.S only, native PE test link",
                   "full_firmware_built": False, "hardware_boot_tested": False,
+                  "native_kernel": native,
                   "source_sha256": {str(p.relative_to(ROOT)): hashlib.sha256(p.read_bytes()).hexdigest() for p in sources}}
         (output / "report.json").write_text(json.dumps(report, indent=2) + "\n")
     finally:
@@ -197,15 +211,20 @@ def main():
     parser.add_argument("--mde", type=Path, default=ROOT / "uefi-lavender/Mu_Basecore/MdePkg/Include")
     parser.add_argument("--output", type=Path, help="Keep objects, disassembly and command/report JSON here")
     parser.add_argument("--sanitize", action="store_true", help="Run the host C test with UBSan")
+    parser.add_argument("--kernel", type=Path, help="Run the complete loader bank regression and parser on this native 8796 kernel")
+    parser.add_argument("--kernel-sha256", help="Require the supplied native kernel's SHA-256")
     args = parser.parse_args()
+    if args.kernel_sha256 and not args.kernel:
+        parser.error("--kernel-sha256 requires --kernel")
+    kernel = args.kernel.resolve() if args.kernel else None
     if args.output:
-        verify(args.output.resolve(), args.mde.resolve(), args.sanitize)
+        verify(args.output.resolve(), args.mde.resolve(), args.sanitize, kernel, args.kernel_sha256)
         print(f"Evidence: {args.output.resolve()}")
     else:
         approved = Path("/data/data/com.termux/files/usr/tmp/opencode")
         parent = approved if approved.is_dir() else Path(tempfile.gettempdir())
         with tempfile.TemporaryDirectory(prefix="darwin-checks-", dir=parent) as tmp:
-            verify(Path(tmp), args.mde.resolve(), args.sanitize)
+            verify(Path(tmp), args.mde.resolve(), args.sanitize, kernel, args.kernel_sha256)
 
 
 if __name__ == "__main__":

@@ -9,6 +9,7 @@ FILES = [
     "README.md", "CLOVER-REFERENCE.md", "REPOSITORIES.md", "AGENTS.md", ".gitignore", ".gitmodules", "firmware.toml", "stage1.toml", "stage2.toml",
     "UniXNU/drivers/DarwinBoot/DarwinBootPkg/Driver/BootArgs.h",
     "UniXNU/drivers/DarwinBoot/DarwinBootPkg/Driver/BootPolicy.h",
+    "UniXNU/drivers/DarwinBoot/DarwinBootPkg/Driver/BootstrapBank.h",
     "UniXNU/drivers/DarwinBoot/DarwinBootPkg/Driver/CpuHandoff.c",
     "UniXNU/drivers/DarwinBoot/DarwinBootPkg/Driver/CpuHandoff.h",
     "UniXNU/drivers/DarwinBoot/DarwinBootPkg/Driver/DarwinBoot.c",

@@ -75,13 +75,13 @@ STATIC VOID TestAbi (VOID) {
 
   ZeroMem (&Values, sizeof (Values));
   Values.Revision = 2; Values.Version = 2;
-  Values.VirtualBase = 0xfffffe0007004000ULL;
-  Values.PhysicalBase = 0xa0004000;
+  Values.VirtualBase = 0xfffffe0006000000ULL;
+  Values.PhysicalBase = 0xa0000000;
   Values.MemorySize = SIZE_1GB;
-  Values.TopOfKernelData = 0xa1004000;
+  Values.TopOfKernelData = 0xa298c000;
   for (I = 0; I < 6; I++) { Values.Video[I] = 0x1122334455667700ULL + I; }
   Values.MachineType = 0xabcdef01;
-  Values.DeviceTree = Values.VirtualBase + 0x100000;
+  Values.DeviceTree = Values.VirtualBase + 0x2988000;
   Values.DeviceTreeLength = 0x9988;
   Values.BootFlags = 0x8877665544332211ULL;
   Values.MemorySizeActual = 0x123456789abcdef0ULL;
@@ -247,6 +247,16 @@ STATIC VOID KernelFixture (UINT64 Base) {
   WriteUnaligned32 ((UINT32 *)(K + 112), 6);
   WriteUnaligned32 ((UINT32 *)(K + 116), 68);
   WriteUnaligned64 ((UINT64 *)(K + 104 + 272), Base + 0x800);
+  Mock.KernelData = Mock.Kernel;
+  Mock.KernelSize = sizeof (Mock.Kernel);
+  assert (ParseKernel (Mock.KernelData, Mock.KernelSize, &Mock.ExpectedKernel) == EFI_SUCCESS);
+  Mock.ExpectedVirtualBase = (Mock.ExpectedPage == 16384) ? (Base & ~0x01ffffffULL) : Base;
+}
+
+STATIC VOID KernelSpanFixture (UINT64 Base, UINT64 Span) {
+  KernelFixture (Base);
+  WriteUnaligned64 ((UINT64 *)(Mock.Kernel + 32 + 32), Span);
+  assert (ParseKernel (Mock.Kernel, sizeof (Mock.Kernel), &Mock.ExpectedKernel) == EFI_SUCCESS);
 }
 
 STATIC VOID BootFixture (UINT32 Abi, UINT32 Page, UINT64 Cpu, UINT32 Method, UINT64 Memory, BOOLEAN Explicit) {
@@ -406,25 +416,152 @@ STATIC VOID TestMeasuredWindow (VOID) {
   Mock.Map[1].PhysicalStart = 0xb0000000;
   Mock.Map[1].NumberOfPages = EFI_SIZE_TO_PAGES (0xfeac0000ULL - 0xb0000000);
   Mock.MapCount = 2;
-  ZeroMem (&K, sizeof (K)); K.Base = 0xfffffe0007004000ULL;
-  assert (AllocateWindow (&K, SIZE_1GB, &Address) == EFI_SUCCESS && Address == 0xa0004000);
+  BootFixture (22, 16384, 0x100, DARWIN_PSCI_SMC, SIZE_1GB, TRUE);
+  K = Mock.ExpectedKernel;
+  assert (PrepareKernelBank (&K, 16384, SIZE_1GB) == EFI_SUCCESS && K.Base == 0xfffffe0006000000ULL);
+  assert (AllocateWindow (&K, 16384, SIZE_1GB, &Address) == EFI_SUCCESS && Address == 0xa0000000);
+  assert (Address + SIZE_1GB <= 0xfeac0000 && Mock.WindowPages == 262144);
+  Cases++;
+  // The probe's a0004000 was an aligned analysis candidate, not descriptor start.
+  K = Mock.ExpectedKernel;
+  assert (AllocateWindow (&K, 4096, SIZE_1GB, &Address) == EFI_SUCCESS && Address == 0xa0004000);
   assert (Address + SIZE_1GB <= 0xfeac0000 && Mock.WindowPages == 262144);
   assert (Mock.PoolCount == 0);
   Cases++;
-  puts ("PASS: actual allocator on measured 0xa0004000..0xfeac0000 fixture, no RAM fallback");
+  Mock.Map[0].PhysicalStart = 0xa0004000;
+  Mock.Map[0].NumberOfPages = EFI_SIZE_TO_PAGES (0xb0000000ULL - 0xa0004000);
+  K = Mock.ExpectedKernel;
+  assert (PrepareKernelBank (&K, 16384, SIZE_1GB) == EFI_SUCCESS);
+  assert (AllocateWindow (&K, 16384, SIZE_1GB, &Address) == EFI_SUCCESS && Address == 0xa2000000);
+  assert (Address + SIZE_1GB <= 0xfeac0000 && Mock.PoolCount == 0);
+  Cases++;
+  puts ("PASS: real descriptor a0000000..feac0000 bank and 4 KiB offsets; descriptor a0004000 forces next 32 MiB bank a2000000");
 }
 
-int main (void) {
+STATIC VOID TestBankBounds (VOID) {
+  UINT64 Base, Address, Cursor, End;
+  KERNEL K;
+
+  assert (DarwinBootstrapBlockSize (4096) == 0x200000 && DarwinBootstrapBlockSize (16384) == 0x2000000);
+  assert (!DarwinBootstrapPhaseMatches (0xfffffe0007004000ULL, 0xa0004000, 16384));
+  assert (BootstrapTranslation (0xfffffe0007004000ULL, 0xfffffe0007004000ULL, 0xa0004000, 16384) == 0xa1004000);
+  assert (DarwinBootstrapPhaseMatches (0xfffffe0007004000ULL, 0xa0004000, 4096));
+  assert (DarwinBootstrapPhaseMatches (0xfffffe0007004000ULL, 0xa1004000, 16384));
+  Base = 0x1122;
+  assert (!DarwinBootstrapBankBase (0xfffffe0007005000ULL, 0xfffffe0007009000ULL, 16384, SIZE_1GB, &Base) && Base == 0x1122);
+  assert (!DarwinBootstrapBankBase (0xfffffe0007004000ULL, 0xfffffe0007004000ULL, 16384, SIZE_1GB, &Base));
+  assert (!DarwinBootstrapBankBase (0xfffffe0007004000ULL, 0xfffffe0007008000ULL, 8192, SIZE_1GB, &Base));
+  Address = 0x1122;
+  assert (!DarwinBootstrapCandidate (MAX_UINT64 - 4095, MAX_UINT64, 0xfffffe0006000000ULL, 16384, SIZE_1GB, &Address) && Address == 0x1122);
+  assert (!DarwinBootstrapCandidate (0xa0000000, 0xfeac0000, 0xfffffe0007004000ULL, 16384, SIZE_1GB, &Address));
+  Cursor = 0;
+  assert (DarwinBankReserve (0xa0001000, SIZE_64KB, &Cursor, SIZE_16KB, SIZE_4KB, &Address));
+  assert (Address == 0xa0004000 && Cursor == 0x4000); // Absolute alignment for legacy 4 KiB.
+  Cursor = SIZE_32MB - SIZE_16KB;
+  assert (DarwinBankReserve (0xa0000000, SIZE_32MB, &Cursor, SIZE_16KB, SIZE_16KB, &Address) && Cursor == SIZE_32MB);
+  assert (!DarwinBankReserve (0xa0000000, SIZE_32MB, &Cursor, 1, 1, &Address) && Cursor == SIZE_32MB);
+  Cursor = 0; Address = 0x1122;
+  assert (!DarwinBankReserve (MAX_UINT64 - 15, 32, &Cursor, 16, 8, &Address) && Cursor == 0 && Address == 0x1122);
+  assert (!DarwinBankReserve (0xa0000000, SIZE_32MB, &Cursor, 3, 1, &Address));
+  assert (!DarwinConventionalRangeEnd (0xa0000000, MAX_UINT64, &End));
+  assert (!DarwinConventionalRangeEnd (MAX_UINT64 - 4095, 1, &End));
+  Cases += 17;
+
+  ResetMock (); BootFixture (22, 16384, 0x100, DARWIN_PSCI_SMC, WINDOW_SIZE, TRUE);
+  KernelSpanFixture (0xfffffe0007ffc000ULL, WINDOW_SIZE - SIZE_2MB);
+  K = Mock.ExpectedKernel;
+  assert (PrepareKernelBank (&K, 16384, WINDOW_SIZE) == EFI_LOAD_ERROR && K.Base == Mock.ExpectedKernel.Base);
+  assert (PrepareKernelBank (&K, 16384, SIZE_1GB) == EFI_SUCCESS); // Prefix fits the larger existing budget.
+  ExpectFailure (EFI_LOAD_ERROR);
+  assert (Mock.WindowAttempts == 0 && Mock.OnCalls == 0);
+
+  ResetMock (); BootFixture (22, 16384, 0x100, DARWIN_PSCI_SMC, WINDOW_SIZE, TRUE);
+  KernelSpanFixture (0xfffffe0007004000ULL, WINDOW_SIZE - SIZE_2MB - 0x1004000);
+  ExpectFailure (EFI_BAD_BUFFER_SIZE); // Kernel ends at admitted limit: no argument/ADT space.
+  assert (Mock.WindowAllocations == 1 && Mock.OnCalls == 0);
+  KernelSpanFixture (0xfffffe0007004000ULL, WINDOW_SIZE - SIZE_2MB - 0x1004000 + SIZE_16KB);
+  ExpectFailure (EFI_LOAD_ERROR); // One granule more fails before another allocation.
+  assert (Mock.WindowAllocations == 1);
+
+  ResetMock (); BootFixture (23, 4096, 0, 0, WINDOW_SIZE, TRUE);
+  KernelSpanFixture (0xfffffe0007004000ULL, WINDOW_SIZE - SIZE_2MB);
+  ExpectFailure (EFI_BAD_BUFFER_SIZE); assert (Mock.WindowAllocations == 1);
+  ResetMock (); BootFixture (23, 4096, 0, 0, SIZE_1GB, TRUE);
+  KernelFixture (0xffffffffe1004000ULL); ExpectFailure (EFI_LOAD_ERROR); assert (Mock.WindowAttempts == 0);
+  ResetMock (); BootFixture (22, 16384, 0x100, DARWIN_PSCI_SMC, SIZE_1GB, TRUE);
+  KernelFixture (0xffffffffe1004000ULL); ExpectFailure (EFI_LOAD_ERROR); assert (Mock.WindowAttempts == 0);
+
+  GoldFixture ();
+  Mock.Map[0].NumberOfPages = MAX_UINT64;
+  Mock.Map[1].Type = EfiReservedMemoryType;
+  ExpectFailure (EFI_OUT_OF_RESOURCES); assert (Mock.WindowAttempts == 0);
+  GoldFixture (); Mock.WindowAllocateStatus = EFI_OUT_OF_RESOURCES;
+  ExpectFailure (EFI_OUT_OF_RESOURCES); assert (Mock.ContextAllocations == 0);
+  GoldFixture ();
+  Mock.Map[0].PhysicalStart = 0xa0004000;
+  Mock.Map[0].NumberOfPages = EFI_SIZE_TO_PAGES (SIZE_1GB);
+  Mock.Map[1].Type = EfiReservedMemoryType;
+  Mock.MapCount = 2;
+  ExpectFailure (EFI_OUT_OF_RESOURCES); assert (Mock.WindowAttempts == 0);
+  puts ("PASS: bank-prefix/span admission, tight payload reserve, VA/PA arithmetic overflow, malformed map and allocation failures");
+}
+
+STATIC VOID TestNativeBank (CONST UINT8 *Data, UINTN Size, UINT64 PhysicalBase) {
+  ResetMockAt (0xa0000000);
+  BootFixture (22, 16384, 0x100, DARWIN_PSCI_SMC, SIZE_1GB, TRUE);
+  Mock.KernelData = Data;
+  Mock.KernelSize = Size;
+  assert (ParseKernel (Data, Size, &Mock.ExpectedKernel) == EFI_SUCCESS);
+  assert (Mock.ExpectedKernel.Base == 0xfffffe0007004000ULL && Mock.ExpectedKernel.Entry == 0xfffffe00074ba488ULL);
+  assert (Mock.ExpectedKernel.End == 0xfffffe0008984000ULL);
+  Mock.ExpectedVirtualBase = 0xfffffe0006000000ULL;
+  if (PhysicalBase != 0xa0000000) {
+    assert (PhysicalBase == 0xa2000000);
+    Mock.Map[0].PhysicalStart += SIZE_16KB;
+    Mock.Map[0].NumberOfPages -= EFI_SIZE_TO_PAGES (SIZE_16KB);
+  }
+  // Anonymous RAM starts zero. Poison it so a missing bank-prefix/BSS clear
+  // cannot pass, and compare every loaded segment against the actual Mach-O.
+  memset ((VOID *)(UINTN)PhysicalBase, 0xa5, (size_t)(Mock.ExpectedKernel.End - Mock.ExpectedVirtualBase + SIZE_64KB));
+  ExpectEnter ();
+  assert (Mock.Window == PhysicalBase);
+  assert (Mock.EnteredEntry == PhysicalBase + 0x014ba488 && Mock.EnteredArgs == PhysicalBase + 0x02984000);
+  assert (Mock.EnteredTree == PhysicalBase + 0x02988000);
+  assert (U64 ((VOID *)(UINTN)(Mock.EnteredArgs + 8)) == 0xfffffe0006000000ULL);
+  assert (U64 ((VOID *)(UINTN)(Mock.EnteredArgs + 0x10)) == PhysicalBase);
+  assert (U32 ((VOID *)(UINTN)(PhysicalBase + 0x01004000)) == 0xfeedfacf);
+  printf ("PASS: native bank va=fffffe0006000000 pa=%llx header=%llx entry=%llx args=%llx tree=%llx; all copied segments/BSS/prefix and L2 phases\n",
+          (unsigned long long)PhysicalBase, (unsigned long long)(PhysicalBase + 0x01004000),
+          (unsigned long long)Mock.EnteredEntry, (unsigned long long)Mock.EnteredArgs, (unsigned long long)Mock.EnteredTree);
+}
+
+int main (int argc, char **argv) {
+  UINT8 *Native = NULL;
+  UINTN NativeSize = 0;
   setvbuf (stdout, NULL, _IOLBF, 0);
   TestAbi ();
   TestGranules ();
   TestPolicyParser ();
   TestBootPaths ();
   TestMeasuredWindow ();
+  TestBankBounds ();
+  if (argc == 2) {
+    FILE *File = fopen (argv[1], "rb");
+    assert (File != NULL && fseek (File, 0, SEEK_END) == 0);
+    long Bytes = ftell (File);
+    assert (Bytes > 0 && fseek (File, 0, SEEK_SET) == 0);
+    NativeSize = (UINTN)Bytes;
+    Native = malloc ((size_t)NativeSize);
+    assert (Native != NULL && fread (Native, 1, (size_t)NativeSize, File) == (size_t)NativeSize);
+    assert (fclose (File) == 0);
+    TestNativeBank (Native, NativeSize, 0xa0000000);
+    TestNativeBank (Native, NativeSize, 0xa2000000);
+  } else { assert (argc == 1); }
   // Release host fixture resources; these are not firmware cleanup calls.
   for (UINTN I = 0; I < Mock.PoolCount; I++) { free (Mock.Pools[I]); }
   assert (munmap (Mock.Memory, (size_t)Mock.MemoryBytes) == 0);
   assert (munmap (Mock.ContextMemory, sizeof (DARWIN_CPU_CONTEXT)) == 0);
+  free (Native);
   printf ("PASS: %llu ABI/policy/state/integration checks against production sources\n", (unsigned long long)Cases);
   return 0;
 }
