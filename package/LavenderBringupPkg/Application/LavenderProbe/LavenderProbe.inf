@@ -1,0 +1,34 @@
+## SPDX-License-Identifier: BSD-2-Clause-Patent
+[Defines]
+  INF_VERSION = 0x00010019
+  BASE_NAME = LavenderProbe
+  FILE_GUID = 53C03A68-059A-45CE-9CB0-D953084A8094
+  MODULE_TYPE = UEFI_APPLICATION
+  VERSION_STRING = 0.1
+  ENTRY_POINT = LavenderProbeEntry
+
+[Sources]
+  LavenderProbe.c
+
+[Packages]
+  MdePkg/MdePkg.dec
+  UniXNUPkg/UniXNUPkg.dec
+  LavenderBringupPkg/LavenderBringupPkg.dec
+
+[LibraryClasses]
+  BaseLib
+  BaseMemoryLib
+  FdtLib
+  HobLib
+  MemoryAllocationLib
+  PrintLib
+  UefiApplicationEntryPoint
+  UefiBootServicesTableLib
+  UefiLib
+
+[Protocols]
+  gEfiLoadedImageProtocolGuid
+  gEfiGraphicsOutputProtocolGuid
+  gEfiSimpleFileSystemProtocolGuid
+  gEfiBlockIoProtocolGuid
+  gUniXNULoaderProtocolGuid

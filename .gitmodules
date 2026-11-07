@@ -1,0 +1,12 @@
+[submodule "UniXNU"]
+	path = UniXNU
+	url = https://github.com/aLpHa-Git-69/UniXNU.git
+	branch = lavender
+[submodule "uefi-lavender"]
+	path = uefi-lavender
+	url = https://github.com/aLpHa-Git-69/uefi-lavender.git
+	branch = lavender
+[submodule "ios-lavender"]
+	path = ios-lavender
+	url = https://github.com/aLpHa-Git-69/ios-lavender.git
+	branch = lavender

@@ -1,0 +1,27 @@
+## SPDX-License-Identifier: BSD-2-Clause-Patent
+[Defines]
+  INF_VERSION = 0x00010019
+  BASE_NAME = LavenderKernelProbe
+  FILE_GUID = B6E0F67D-2268-4DDC-913E-548B3B6A6442
+  MODULE_TYPE = UEFI_APPLICATION
+  VERSION_STRING = 0.1
+  ENTRY_POINT = LavenderKernelProbeEntry
+
+[Sources.AARCH64]
+  LavenderKernelProbe.c
+  GoldEntry.S
+  MemoryRuns.h
+
+[Packages]
+  MdePkg/MdePkg.dec
+  LavenderBringupPkg/LavenderBringupPkg.dec
+
+[LibraryClasses]
+  UefiApplicationEntryPoint
+
+[BuildOptions]
+  GCC:*_*_AARCH64_CC_FLAGS = -I$(WORKSPACE)/../UniXNU/drivers/DarwinBoot/DarwinBootPkg/Driver
+  MSFT:*_*_AARCH64_CC_FLAGS = -I$(WORKSPACE)/../UniXNU/drivers/DarwinBoot/DarwinBootPkg/Driver
+
+[Protocols]
+  gEfiGraphicsOutputProtocolGuid

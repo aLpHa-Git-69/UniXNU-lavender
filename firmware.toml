@@ -1,0 +1,42 @@
+# Firmware-only stage 1. This is not an XNU/device OS profile.
+[firmware]
+config = "lavender"
+dsc = "Platforms/Xiaomi/lavenderPkg/lavender.dsc"
+fd = "Build/lavenderPkg/{target}_CLANGPDB/FV/SILICIUM_UEFI.fd"
+packages = [
+  "{uefi}",
+  "{uefi}/Platforms/Xiaomi",
+  "{uefi}/Common/Mu",
+  "{uefi}/Common/Mu_OEM_Sample",
+  "{edk2}",
+  "{uefi}/Silicon/Qualcomm",
+  "{uefi}/Silicon/Silicium",
+  "{uefi}/Silicium-ACPI",
+  "{uefi}/Silicium-ACPI/Platforms/Xiaomi",
+  "{uefi}/Silicium-ACPI/Silicon/Qualcomm",
+  "{tree}/package",
+  "{tree}/drivers/DarwinBoot",
+  "{uefi}/../package",
+]
+patches = [
+  "Resources/MuPatches/Auth-Service.patch",
+  "Resources/MuPatches/Boot-Manager.patch",
+  "Resources/MuPatches/Timer.patch",
+  "Resources/MuPatches/Usb-Bus.patch",
+]
+
+[firmware.defines]
+UNIXNU_BUILD = "1"
+ENABLE_SECUREBOOT = "0"
+MEMORY_PROTECTION = "TRUE"
+SHIP_MODE = "FALSE"
+
+[bootimg]
+# Match the existing hardware-booted Lavender geometry.
+[bootimg.image]
+header_version = 0
+base = 0
+kernel_offset = 0x8000
+ramdisk_offset = 0x01000000
+tags_offset = 0x100
+pagesize = 4096

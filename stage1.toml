@@ -1,0 +1,34 @@
+version = 1
+
+[boot]
+default = "lavender-probe"
+timeout = 15
+fallback_timeout = 15
+rotate = 0
+
+[ui]
+title = "UniXNU - Redmi Note 7 / lavender"
+
+[[entry]]
+id = "lavender-probe"
+title = "Stage 1: firmware and RAM payload checks"
+type = "efi"
+path = "Payloads/LavenderProbe.efi"
+
+[[entry]]
+id = "tools"
+title = "Tools"
+type = "action"
+action = "tools"
+
+[[entry]]
+id = "reset"
+title = "Restart"
+type = "action"
+action = "reset"
+
+[[entry]]
+id = "exit"
+title = "Return to firmware"
+type = "action"
+action = "exit"

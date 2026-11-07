@@ -1,0 +1,40 @@
+version = 1
+
+[boot]
+default = "lavender-kernel-probe"
+timeout = 15
+fallback_timeout = 15
+rotate = 0
+
+[ui]
+title = "UniXNU - Redmi Note 7 / lavender"
+
+[[entry]]
+id = "lavender-kernel-probe"
+title = "Stage 2: Gold CPU and kernel memory"
+type = "efi"
+path = "Payloads/LavenderKernelProbe.efi"
+
+[[entry]]
+id = "lavender-probe"
+title = "Stage 1: firmware and RAM payload checks"
+type = "efi"
+path = "Payloads/LavenderProbe.efi"
+
+[[entry]]
+id = "tools"
+title = "Tools"
+type = "action"
+action = "tools"
+
+[[entry]]
+id = "reset"
+title = "Restart"
+type = "action"
+action = "reset"
+
+[[entry]]
+id = "exit"
+title = "Return to firmware"
+type = "action"
+action = "exit"
