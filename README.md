@@ -8,6 +8,10 @@ The user requested regular publication in separate component repositories;
 [REPOSITORIES.md](REPOSITORIES.md) lists their roles and pinned commits.
 Target userland is the iOS 16.5 installation already on userdata.
 
+The rebuilt native kernel and UEFI firmware now pass their full Actions
+builds. A temporary kernel/ADT boot image has been assembled and unpacked
+successfully; its kernel/root hardware result is the next checkpoint.
+
 ## Current result
 
 **UEFI, the configured UniXNU menu and all seven Stage-1 hardware checks
@@ -199,17 +203,43 @@ from this hardware record.
 
 ## Next checkpoint: XNU kernel handoff
 
+The current test image is
+`out/ios16-boot-public/lavender-unixnu-ios16.img` (22,577,152 bytes), SHA-256
+`d83796db90cd2ada5ad14c66ba8a8ca901811147d9d9fd705daf92a3d42494e7`.
+It contains the rebuilt Darwin 22 kernel, the new loader/firmware, a 20 MiB
+FAT payload and the iOS 16.5 D22AP product identity. It selects Gold `0x100`,
+16 KiB pages, one CPU and `rd=emmcroot0`. The initial root path is read-only;
+persistent kernel logging and userdata/GPT rewriting are not selected.
+
+```sh
+fastboot boot out/ios16-boot-public/lavender-unixnu-ios16.img
+```
+
+Photograph the last visible `DARWINBOOT`, Darwin kernel or SDHCI/root lines.
+The image build/round trips pass; a running iOS root has not yet been observed.
+The manual `Lavender iOS 16 test image` Actions workflow publishes the same
+assembly recipe with checked kernel/firmware artifact inputs. Its generated
+ADT entropy means each build has its own image hash.
+
+Reproduce with local checked inputs:
+
+```sh
+python3 scripts/build-ios16-boot.py --firmware out/ios16-firmware \
+  --kernel out/ios16-kernel/kernel.development.lavender \
+  --product-adt out/ios16-apple/d22ap.adt --dtb resources/lavender.dtb \
+  --out out/ios16-boot-public
+```
+
 The iOS milestone needs a compatible kernel/ADT and the SDM660 storage,
 display and input integration for the selected OS ABI. The historical
 Lavender XNU path uses 16 KiB pages on Gold CPUs; the required Gold CPU and
 RAM budget are now measured on this firmware. UniXNU's
 SM8550-specific GPU/storage/touch drivers are not SDM660 implementations.
 
-For the reviewed Darwin 22 kernel, pending loader work includes the Gold
-handoff, 736-byte boot-args ABI with a 608-byte command line (current DarwinBoot
-uses the 1,152-byte Darwin 23 structure), actual ADT, and a larger OS-payload
-reservation policy. SEC currently copies at most 8 MiB; the new readiness
-image still uses the already-supported 4 MiB payload.
+The published loader implements Gold handoff and the 736-byte Darwin 22
+boot-args ABI; the board ADT explicitly selects it. The rebuilt SEC accepts
+the disjoint 20 MiB FAT copy slot. The earlier readiness image used the
+4 MiB payload; hardware kernel/root verification now applies to this new image.
 
 ## Reference repositories
 

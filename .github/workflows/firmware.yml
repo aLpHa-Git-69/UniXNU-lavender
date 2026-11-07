@@ -52,6 +52,7 @@ jobs:
           path: |
             out/firmware/SILICIUM_UEFI.fd
             out/firmware/LavenderProbe.efi
+            out/firmware/stage1-payload.img
             out/firmware/build-report.json
             out/firmware/isa-audit.json
             out/firmware/SHA256SUMS

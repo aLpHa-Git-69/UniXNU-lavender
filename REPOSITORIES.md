@@ -17,3 +17,10 @@ Kernel Actions run [42359466404](https://github.com/aLpHa-Git-69/ios-lavender/ac
 compiled and linked the updated `LAVENDER` target successfully. Its artifact
 still needs image and hardware checks. Userland iOS 16.5 is user-reported;
 the installation's `SystemVersion.plist` has not yet been read.
+
+Board firmware Actions run
+[42363317189](https://github.com/aLpHa-Git-69/UniXNU-lavender/actions/runs/42363317189)
+passed the full FD build and ISA audit. Kernel/image assembly now uses
+`scripts/build-ios16-boot.py`; the manual image workflow publishes the checked
+temporary test artifact. Both source and generated reports identify the
+kernel, loader, FD, ADT, DTB and image hashes. Hardware kernel/root boot is pending.

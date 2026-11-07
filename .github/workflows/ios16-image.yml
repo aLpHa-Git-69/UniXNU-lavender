@@ -1,0 +1,49 @@
+name: Lavender iOS 16 test image
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  image:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Prepare assembly tools and pinned source
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y clang llvm device-tree-compiler mtools unzip
+          git submodule update --init --depth 1 -- UniXNU uefi-lavender ios-lavender
+          python3 -m pip install lzfse
+      - name: Fetch checked kernel and firmware build artifacts
+        run: |
+          mkdir -p out/kernel out/firmware
+          curl --fail --location --retry 3 --output out/kernel.zip https://nightly.link/aLpHa-Git-69/ios-lavender/actions/artifacts/13569009423.zip
+          curl --fail --location --retry 3 --output out/firmware.zip https://nightly.link/aLpHa-Git-69/UniXNU-lavender/actions/artifacts/13571190327.zip
+          printf '%s\n' '21e9d17d7a49a8c01afec069c45634ab4a6af5337ade5acc1e3460a8b70149ab  out/kernel.zip' 'e9583bf4322d3d9a913e8adc6aeaf6547fc066306901208d83a4d4d8d3b71864  out/firmware.zip' | sha256sum -c -
+          unzip -q out/kernel.zip kernel.development.lavender SHA256SUMS -d out/kernel
+          unzip -q out/firmware.zip -d out/firmware
+      - name: Fetch iOS 16.5 Apple product-tree input
+        run: |
+          python3 ios-lavender/tools/remotezip.py 'https://updates.cdn-apple.com/2023SpringFCS/fullrestores/032-85130/6AB0D10A-8AF9-4F6C-8CF5-A1B315CABE88/iPhone10,3,iPhone10,6_16.5_20F66_Restore.ipsw' DeviceTree.d22ap out/apple-input
+          python3 scripts/decode-apple-adt.py out/apple-input/Firmware/all_flash/DeviceTree.d22ap.im4p --output out/apple-input/d22ap.adt
+      - name: Build and round-trip verify temporary boot image
+        run: |
+          python3 scripts/build-ios16-boot.py --firmware out/firmware --kernel out/kernel/kernel.development.lavender --product-adt out/apple-input/d22ap.adt --dtb resources/lavender.dtb --out out/ios16-boot
+          (cd out/ios16-boot && sha256sum -c SHA256SUMS)
+      - uses: actions/upload-artifact@v4
+        with:
+          name: lavender-ios16-test-boot
+          path: |
+            out/ios16-boot/lavender-unixnu-ios16.img
+            out/ios16-boot/build-report.json
+            out/ios16-boot/boot.json
+            out/ios16-boot/SHA256SUMS
+            out/ios16-boot/payload.img
+          if-no-files-found: error
