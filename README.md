@@ -203,7 +203,7 @@ from this hardware record.
 
 ## Next checkpoint: XNU kernel handoff
 
-The current test image is
+The first test image (the failing baseline) is
 `out/ios16-boot-public/lavender-unixnu-ios16.img` (22,577,152 bytes), SHA-256
 `d83796db90cd2ada5ad14c66ba8a8ca901811147d9d9fd705daf92a3d42494e7`.
 It contains the rebuilt Darwin 22 kernel, the new loader/firmware, a 20 MiB
@@ -241,13 +241,30 @@ The earlier image above is the failing baseline; the next FD/image rebuild
 must contain the corrected bank loader. Kernel/root hardware verification
 remains pending.
 
+The corrected FD passed full build and ISA checks in Actions
+[42371686365](https://github.com/aLpHa-Git-69/UniXNU-lavender/actions/runs/42371686365).
+The new test image is `out/ios16-boot-bankfix/lavender-unixnu-ios16.img`,
+22,581,248 bytes, SHA-256
+`c69e916793367023dae1a5d39af19fe823a01784e7185c12fa03842ed68f08cc`.
+Its actual FD/loader, kernel, ADT, FAT files and boot-image parts are verified.
+The image workflow is now pinned to that corrected firmware artifact.
+
+```sh
+fastboot boot out/ios16-boot-bankfix/lavender-unixnu-ios16.img
+```
+
+Capture the loader's bank/linked-header line and the screen bottom. The native
+kernel's white marker is at x=0..63, y=2300..2331 before MMU enable; its blue
+marker is full-width y=2250..2265 after MMU enable. Marker visibility locates
+startup; it does not itself establish root/userland execution.
+
 Reproduce with local checked inputs:
 
 ```sh
-python3 scripts/build-ios16-boot.py --firmware out/ios16-firmware \
+python3 scripts/build-ios16-boot.py --firmware out/ios16-firmware-bankfix \
   --kernel out/ios16-kernel/kernel.development.lavender \
   --product-adt out/ios16-apple/d22ap.adt --dtb resources/lavender.dtb \
-  --out out/ios16-boot-public
+  --out out/ios16-boot-bankfix
 ```
 
 The iOS milestone needs a compatible kernel/ADT and the SDM660 storage,

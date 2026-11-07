@@ -25,8 +25,8 @@ jobs:
         run: |
           mkdir -p out/kernel out/firmware
           curl --fail --location --retry 3 --output out/kernel.zip https://nightly.link/aLpHa-Git-69/ios-lavender/actions/artifacts/13569009423.zip
-          curl --fail --location --retry 3 --output out/firmware.zip https://nightly.link/aLpHa-Git-69/UniXNU-lavender/actions/artifacts/13571190327.zip
-          printf '%s\n' '21e9d17d7a49a8c01afec069c45634ab4a6af5337ade5acc1e3460a8b70149ab  out/kernel.zip' 'e9583bf4322d3d9a913e8adc6aeaf6547fc066306901208d83a4d4d8d3b71864  out/firmware.zip' | sha256sum -c -
+          curl --fail --location --retry 3 --output out/firmware.zip https://nightly.link/aLpHa-Git-69/UniXNU-lavender/actions/artifacts/13574555736.zip
+          printf '%s\n' '21e9d17d7a49a8c01afec069c45634ab4a6af5337ade5acc1e3460a8b70149ab  out/kernel.zip' '5e02524d641b74a0e7ee345055d7270428986a7349cdba705dce85131bca47f7  out/firmware.zip' | sha256sum -c -
           unzip -q out/kernel.zip kernel.development.lavender SHA256SUMS -d out/kernel
           unzip -q out/firmware.zip -d out/firmware
       - name: Fetch iOS 16.5 Apple product-tree input
