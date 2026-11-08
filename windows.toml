@@ -1,0 +1,40 @@
+version = 1
+
+[boot]
+default = "windows-winpe"
+timeout = 10
+fallback_timeout = 10
+rotate = 0
+
+[ui]
+title = "Windows ARM64 - Redmi Note 7 / lavender"
+
+[[entry]]
+id = "windows-winpe"
+title = "Windows 10 ARM64: WinPE RAM boot"
+type = "efi"
+path = "\\EFI\\Boot\\bootaa64.efi"
+
+[[entry]]
+id = "lavender-probe"
+title = "Firmware and RAM payload checks"
+type = "efi"
+path = "Payloads/LavenderProbe.efi"
+
+[[entry]]
+id = "tools"
+title = "Tools"
+type = "action"
+action = "tools"
+
+[[entry]]
+id = "reset"
+title = "Restart"
+type = "action"
+action = "reset"
+
+[[entry]]
+id = "exit"
+title = "Return to firmware"
+type = "action"
+action = "exit"

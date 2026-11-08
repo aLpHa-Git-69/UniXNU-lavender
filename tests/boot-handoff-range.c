@@ -63,6 +63,35 @@ int main(void)
       return 1;
     }
   }
-  puts("boot handoff range: 12 boundary/overflow and 12 copy-layout cases PASS");
+  struct window_test {
+    uint64_t fdt, fdt_size, fdt_low, fdt_high, initrd, initrd_size, low, high;
+    int expected;
+  } windows[] = {
+    {0x85400000, 0x80000, 0x80000000, 0x85800000, 0xc0000000, 0x10000000, 0xc0000000, 0xd0000000, 1},
+    {0x85400000, 0x100000, 0x80000000, 0x85800000, 0xc0000000, 0x400000, 0xc0000000, 0xd0000000, 1},
+    {0x85400000, 40, 0x80000000, 0x85800000, 0xcffffe00, 512, 0xc0000000, 0xd0000000, 1},
+    {0x85400000, 40, 0x80000000, 0x85800000, 0xc0000000, 0x10000200, 0xc0000000, 0xd0000000, 0},
+    {0x85400000, 40, 0x80000000, 0x85800000, 0xbffffe00, 512, 0xc0000000, 0xd0000000, 0},
+    {0x85400000, 40, 0x80000000, 0x85800000, 0xd0000000, 512, 0xc0000000, 0xd0000000, 0},
+    {0x85400000, 40, 0x80000000, 0x85800000, 0xc0000001, 512, 0xc0000000, 0xd0000000, 0},
+    {0x85400000, 40, 0x80000000, 0x85800000, 0xc0000000, 513, 0xc0000000, 0xd0000000, 0},
+    {0x85400000, 40, 0x80000000, 0x85800000, 0xc0000000, 0, 0xc0000000, 0xd0000000, 0},
+    {0x85400000, 0, 0x80000000, 0x85800000, 0xc0000000, 512, 0xc0000000, 0xd0000000, 0},
+    {0x94000000, 40, 0x80000000, 0x85800000, 0xc0000000, 512, 0xc0000000, 0xd0000000, 0},
+    {0x85400000, 40, 0x80000000, 0x85800000, 0xc0000000, 512, 0xd0000000, 0xc0000000, 0},
+    {0xc0000000, 40, 0xc0000000, 0xd0000000, 0xc0000000, 512, 0xc0000000, 0xd0000000, 0},
+    {0xc0000100, 40, 0xc0000000, 0xd0000000, 0xc0000000, 512, 0xc0000000, 0xd0000000, 0},
+    {0x85400000, 512, 0x80000000, 0x85800000, 0x85400200, 512, 0x80000000, 0x85800000, 1},
+    {UINT64_MAX - 31, 64, 0, UINT64_MAX, 0xc0000000, 512, 0xc0000000, 0xd0000000, 0},
+  };
+  for (unsigned i = 0; i < sizeof(windows) / sizeof(windows[0]); i++) {
+    struct window_test *t = &windows[i];
+    if (BootHandoffCopiesAcrossWindows(t->fdt, t->fdt_size, t->fdt_low,
+        t->fdt_high, t->initrd, t->initrd_size, t->low, t->high) != t->expected) {
+      fprintf(stderr, "boot handoff separate-window case %u failed\n", i);
+      return 1;
+    }
+  }
+  puts("boot handoff: 12 range, 12 small-payload and 16 WinPE separate-window cases PASS");
   return 0;
 }

@@ -1,12 +1,36 @@
-# Lavender UniXNU bring-up
+# Lavender UEFI / Windows ARM bring-up
 
-Working directory for adapting Mu-Silicium's Redmi Note 7 (`lavender`,
-Qualcomm SDM660) UEFI platform to UniXNU.
+Board/build workspace for Mu-Silicium's Redmi Note 7 (`lavender`, Qualcomm
+SDM660) UEFI platform and its UniXNU EFI boot manager.
 
 Published board workspace: <https://github.com/aLpHa-Git-69/UniXNU-lavender>.
 The user requested regular publication in separate component repositories;
 [REPOSITORIES.md](REPOSITORIES.md) lists their roles and pinned commits.
-Target userland is the iOS 16.5 installation already on userdata.
+The user paused iOS and selected **Windows ARM64**. The active milestone is a
+Windows 10 ARM64 WinPE temporary RAM boot. See [WINDOWS.md](WINDOWS.md) for the
+platform/reference review, checked Microsoft inputs, RAM policy and current
+handoff. The saved iOS kernel checkpoint is `8335656`: interrupt-controller and
+timer discovery followed by native Gold CPU initialization, with no root mount.
+
+The WinPE recipe uses Microsoft's verified `10.0.19041.1` ARM64 image, a
+256 MiB RAM FAT payload at `0xc0000000..0xd0000000`, and the existing Lavender
+ACPI/firmware. Host driver/memory-map and handoff checks pass; the full Windows
+FD/image build and Windows hardware screen are the next checkpoints.
+
+```sh
+python3 tests/windows-checks.py
+python3 scripts/fetch-winpe-inputs.py
+python3 scripts/build-stage1.py --config windows-firmware.toml --target DEBUG --out out/windows-firmware -j 4
+python3 scripts/audit-isa.py --fd out/windows-firmware/SILICIUM_UEFI.fd
+python3 scripts/build-winpe-boot.py
+```
+
+The manual `Lavender Windows PE` Actions workflow produces
+`out/windows-winpe/lavender-winpe.img` with checked manifests. Upstream Lavender
+reports WinPE CPU/display support; full Windows storage/input integration follows
+a local WinPE boot result.
+
+## Saved UEFI/iOS bring-up record
 
 The rebuilt native kernel and UEFI firmware now pass their full Actions
 builds. A temporary kernel/ADT boot image has been assembled and unpacked

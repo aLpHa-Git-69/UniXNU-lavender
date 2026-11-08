@@ -25,10 +25,10 @@ import uuid
 
 ROOT = Path(__file__).resolve().parents[1]
 PINS = {
-    "uefi-lavender": "3b2e7d8ce4dc02bd1cdf66db6421d919410c3a50",
-    "UniXNU": "afca227881b00dd76b7b4b6ce4d16b8a60014483",
+    "uefi-lavender": "b01cc99ad9ad4aa0c5cdb840292376f37ba7dad1",
+    "UniXNU": "27ed66768fba420db0fc9919f777d0a2666ed7c9",
     "UniXNU/drivers/DarwinBoot": "66b68e00ef1a4bb15aaa35a8177b54b72850d921",
-    "ios-lavender": "a14adba76ff52eaf38e24bc883db28266d78673f",
+    "ios-lavender": "83356567124670f50a320b8ecc7c04f7ccf8f8e0",
     "uefi-lavender/Mu_Basecore": "64f478939955e45faa632c160ae2a75a5ff7ef7f",
     "uefi-lavender/Common/Mu": "566cf5c8c2c8adf8e1a337ced1d147bc6246856f",
     "uefi-lavender/Common/Mu_OEM_Sample": "9292f9254adb94c5e5bb09a370b9662fcd66a953",
@@ -120,7 +120,7 @@ def sections(data):
         offset = (offset + size + 3) & ~3
 
 
-def check_firmware(fd, package_paths):
+def firmware_files(fd):
     outer = volume_files(fd.read_bytes())
     container = outer.get("9E21FD93-9C72-4C15-8C4B-E77F1DB2D792")
     if container is None:
@@ -140,6 +140,11 @@ def check_firmware(fd, package_paths):
                 break
     if inner is None:
         raise ValueError("cannot decode the FD's embedded FVMAIN")
+    return inner
+
+
+def check_firmware(fd, package_paths):
+    inner = firmware_files(fd)
     included = {}
     for name in REQUIRED_INFS:
         inf = next((path / name for path in package_paths if (path / name).is_file()), None)
@@ -178,6 +183,8 @@ def main():
     parser.add_argument("--target", choices=("DEBUG", "RELEASE"), default="DEBUG")
     parser.add_argument("-j", "--jobs", type=int, default=min(4, os.cpu_count() or 2))
     parser.add_argument("--skip-build", action="store_true", help="verify and repack the existing FD")
+    parser.add_argument("--config", type=Path, default=ROOT / "firmware.toml",
+                        help="firmware profile (use windows-firmware.toml for WinPE RAM boot)")
     parser.add_argument("--dtb", type=Path, help="matching device boot/recovery DTB")
     parser.add_argument("--out", type=Path, help="output directory (default: out/<target>)")
     args = parser.parse_args()
@@ -195,7 +202,7 @@ def main():
 
     sys.path.insert(0, str(unixnu / "scripts"))
     from unixnu import bootimg, firmware
-    board = tomllib.loads((ROOT / "firmware.toml").read_text())
+    board = tomllib.loads(args.config.read_text())
     ctx = SimpleNamespace(board=board, work=work, tree=unixnu, device=ROOT,
                           logs=work / "logs", jobs=args.jobs,
                           args=SimpleNamespace(skip_preflight=False))
@@ -243,11 +250,16 @@ def main():
         "python": platform.python_version(),
         "clang": command(["clang", "--version"], capture_output=True, text=True).stdout.splitlines()[0],
         "source_commits": revisions,
+        "firmware_config": args.config.resolve().name,
+        "firmware_defines": board["firmware"].get("defines", {}),
         "embedded_modules": modules,
         "artifacts": {str(path.relative_to(work)): {"bytes": path.stat().st_size, "sha256": sha256(path)} for path in artifacts},
         "dtb_sha256": sha256(dtb),
         "boot_geometry": board["bootimg"]["image"],
         "handoff_reserved_window": {"base": "0x80000000", "end": "0x85800000"},
+        "ramdisk_copy_window": ({"base": "0xc0000000", "end": "0xd0000000"}
+                                if "WINDOWS_BUILD" in board["firmware"].get("defines", {})
+                                else {"base": "0x84000000", "end": "0x85400000"}),
     }
     (work / "build-report.json").write_text(json.dumps(report, indent=2) + "\n")
     (work / "SHA256SUMS").write_text("".join(f"{sha256(path)}  {path.relative_to(work)}\n" for path in artifacts))
