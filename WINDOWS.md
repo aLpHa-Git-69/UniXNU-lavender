@@ -116,11 +116,18 @@ compile for Cortex-A53 ARM64 and are checked for LSE/RCpc instructions.
 Microsoft inputs are downloaded/verified. Windows RAM-profile source changes,
 image recipe and manual CI workflow are implemented. Host/UBSan checks pass,
 including actual driver/memory-map code and Cortex-A53 ARM64 compilation.
-Published component commits: firmware `b01cc99ad9ad4aa0c5cdb840292376f37ba7dad1`,
+Published component commits: firmware `107bdbcb5d4c2821fdf7e16c330084056d6a6a8f`,
 boot manager `27ed66768fba420db0fc9919f777d0a2666ed7c9`. Board pins now select
 those commits and the saved iOS checkpoint. Full Windows-profile firmware build,
 final image verification and the actual Windows hardware screen are next.
 Record their commit/run IDs, image identity and observations here before stopping.
+
+First Windows Actions run `42451849485` at board `bbcdc3d` passed all host/UBSan
+checks, then failed SEC compilation with `unused function 'BootHandoffCopiesWithin'
+[-Werror,-Wunused-function]`. The original-profile control run `42451847767`
+passed its full firmware build/ISA audit. Firmware `107bdbc` makes the three
+pure header helpers static inline; all 40 handoff cases still pass. A fresh
+Windows-profile run with that corrected pin is required.
 
 After a WinPE hardware result, the next Windows OS integration is Lavender's
 SDCC ACPI/driver path. The upstream CPU-only DSDT and a RAM-booted PE image do

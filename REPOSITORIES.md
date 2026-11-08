@@ -3,7 +3,7 @@
 | Repository | Responsibility | Current component pin |
 | --- | --- | --- |
 | [UniXNU-lavender](https://github.com/aLpHa-Git-69/UniXNU-lavender) | This board/build workspace, probes and image assembly | Board commit |
-| [uefi-lavender](https://github.com/aLpHa-Git-69/uefi-lavender/tree/lavender) | Mu-Silicium platform, FDT/initrd preservation and Windows PE RAM reservation | `b01cc99ad9ad4aa0c5cdb840292376f37ba7dad1` |
+| [uefi-lavender](https://github.com/aLpHa-Git-69/uefi-lavender/tree/lavender) | Mu-Silicium platform, FDT/initrd preservation and Windows PE RAM reservation | `107bdbcb5d4c2821fdf7e16c330084056d6a6a8f` |
 | [UniXNU](https://github.com/aLpHa-Git-69/UniXNU/tree/lavender) | Boot manager, Windows RAM-disk path, RAM filesystem and loader submodule | `27ed66768fba420db0fc9919f777d0a2666ed7c9` |
 | [DarwinBoot](https://github.com/aLpHa-Git-69/DarwinBoot/tree/lavender) | Darwin 22/23 ABI, PSCI handoff and coherent 16 KiB bootstrap banks | `66b68e00ef1a4bb15aaa35a8177b54b72850d921` |
 | [ios-lavender](https://github.com/aLpHa-Git-69/ios-lavender/tree/lavender) | Paused Darwin 22 kernel/ADT checkpoint with native Gold CPU initialization and IRQ/timer discovery | `83356567124670f50a320b8ecc7c04f7ccf8f8e0` |
@@ -18,6 +18,7 @@ artifacts rather than source inputs.
 The user paused iOS and selected Windows ARM64. Published firmware `b01cc99`
 adds a checked 256 MiB WinPE copy reservation inside measured RAM; boot manager
 `27ed667` adds the standard volatile RAM-disk device path for Windows builds.
+Firmware `107bdbc` fixes the Windows-only unused-header-helper compilation error.
 Actual host/UBSan driver, memory-map and handoff checks pass, as does changed
 source compilation for Cortex-A53 ARM64. Full Windows FD/image and hardware
 results are tracked in [WINDOWS.md](WINDOWS.md). Microsoft's boot inputs are
