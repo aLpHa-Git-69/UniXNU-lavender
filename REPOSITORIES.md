@@ -24,6 +24,16 @@ source compilation for Cortex-A53 ARM64. Full Windows FD/image and hardware
 results are tracked in [WINDOWS.md](WINDOWS.md). Microsoft's boot inputs are
 local/artifact data, checked by the board recipe.
 
+Windows Actions [42452410093](https://github.com/aLpHa-Git-69/UniXNU-lavender/actions/runs/42452410093)
+at board `a8413c4` passed full firmware compilation, ISA audit, Microsoft input
+verification, 59 FAT-file round trips and Android-image verification. The
+downloaded 270,159,872-byte image matches its recorded SHA-256. Windows execution
+on the current phone is the next hardware checkpoint.
+
+The image has now been temporarily booted on Fastboot-confirmed `lavender`:
+download/boot OKAY, 9.861 s total. This records bootloader acceptance; the final
+Windows/UEFI screen is awaiting a photograph.
+
 ## Saved iOS build record
 
 Kernel Actions run [42359466404](https://github.com/aLpHa-Git-69/ios-lavender/actions/runs/42359466404)

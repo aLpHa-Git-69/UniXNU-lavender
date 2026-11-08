@@ -118,16 +118,60 @@ image recipe and manual CI workflow are implemented. Host/UBSan checks pass,
 including actual driver/memory-map code and Cortex-A53 ARM64 compilation.
 Published component commits: firmware `107bdbcb5d4c2821fdf7e16c330084056d6a6a8f`,
 boot manager `27ed66768fba420db0fc9919f777d0a2666ed7c9`. Board pins now select
-those commits and the saved iOS checkpoint. Full Windows-profile firmware build,
-final image verification and the actual Windows hardware screen are next.
-Record their commit/run IDs, image identity and observations here before stopping.
+those commits and the saved iOS checkpoint. Windows-profile compilation, full
+ISA and final image verification now pass; the actual Windows hardware screen
+is next. Record its image identity and observations here before stopping.
 
 First Windows Actions run `42451849485` at board `bbcdc3d` passed all host/UBSan
 checks, then failed SEC compilation with `unused function 'BootHandoffCopiesWithin'
 [-Werror,-Wunused-function]`. The original-profile control run `42451847767`
 passed its full firmware build/ISA audit. Firmware `107bdbc` makes the three
-pure header helpers static inline; all 40 handoff cases still pass. A fresh
-Windows-profile run with that corrected pin is required.
+pure header helpers static inline; all 40 handoff cases still pass.
+
+Corrected Windows run
+[42452410093](https://github.com/aLpHa-Git-69/UniXNU-lavender/actions/runs/42452410093)
+at board `a8413c4d7336ec7a47b1fb2f525f6f65acc10a1b` passed in 2m52s: host/UBSan,
+full Windows FD build, ISA audit, checked Microsoft ARM64 inputs, 59 FAT-file
+round trips and all Android-image component checks.
+
+Downloaded local files:
+
+- Image: `out/windows-ci/windows-winpe/lavender-winpe.img`, 270,159,872 bytes,
+  SHA-256 `4356b3222dea535a44c6afa2576eb1c6c87ad73dde72976dd2f06e084df6a66a`.
+- FD: `out/windows-ci-logs/windows-firmware/SILICIUM_UEFI.fd`, 3,145,728 bytes,
+  SHA-256 `d8e4f2a916589ccef1dc5e111d15445bc04e914785f09c6a927dc66150cf05de`.
+- Image manifest and boot report are beside the image; source/ISA reports are
+  beside the FD. Both downloaded file hashes match the CI manifests.
+- Artifact `lavender-winpe-ramboot`: ID `13606142314`, GitHub-reported ZIP SHA-256
+  `5b9f18aa5b9730b9c1262a466ff4e768a135da4ca9867bfd6cbfa01aded35f57`.
+- Artifact `lavender-winpe-build-logs`: ID `13605224989`, GitHub-reported ZIP SHA-256
+  `1547f913c74d0ec7d3e6a581f2436e190583e30e2b6d7e6becaf7409c3105fb3`.
+
+After the user put the phone in Fastboot and connected USB, the stock/root
+tool confirmed `product: lavender` and `max-download-size: 402653184`. Use:
+
+```sh
+fastboot boot out/windows-ci/windows-winpe/lavender-winpe.img
+```
+
+The menu defaults to `Windows 10 ARM64: WinPE RAM boot` after ten seconds.
+Capture the final Windows/logo/error/console screen. A Windows command prompt
+would establish PE userland execution; a successful Fastboot transfer alone
+only establishes image acceptance.
+
+**Temporary hardware boot accepted:** the exact image above sent as `263828 KB`
+with download OKAY (8.190 s), boot OKAY (0.143 s), total 9.861 s. No partition
+flash was issued. The private serial/command result record is
+`out/windows-ci/windows-winpe/device-boot.json`. Windows kernel/userland execution
+is awaiting the user's final screen photograph. Resize a supplied camera photo
+to about 1100 pixels wide before reading it into the agent context.
+
+On this Termux host, the stock ARM64 Android Tools 37 binary is extracted under
+`/data/data/com.termux/files/usr/tmp/opencode/root-adb-tools/data/data/com.termux/files/usr/bin/`.
+It runs with `LD_LIBRARY_PATH=/data/data/com.termux/files/usr/lib`; KernelSU root
+provides USB-device access. The existing termux-fastboot frontend did not list
+a target initially; the stock/root binary detected and RAM-booted Lavender after
+the user entered Fastboot mode.
 
 After a WinPE hardware result, the next Windows OS integration is Lavender's
 SDCC ACPI/driver path. The upstream CPU-only DSDT and a RAM-booted PE image do

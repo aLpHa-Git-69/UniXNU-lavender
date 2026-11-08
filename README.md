@@ -14,8 +14,9 @@ timer discovery followed by native Gold CPU initialization, with no root mount.
 
 The WinPE recipe uses Microsoft's verified `10.0.19041.1` ARM64 image, a
 256 MiB RAM FAT payload at `0xc0000000..0xd0000000`, and the existing Lavender
-ACPI/firmware. Host driver/memory-map and handoff checks pass; the full Windows
-FD/image build and Windows hardware screen are the next checkpoints.
+ACPI/firmware. Host checks, full Windows FD build, ISA audit and all 59 FAT-file
+round trips pass in [Actions 42452410093](https://github.com/aLpHa-Git-69/UniXNU-lavender/actions/runs/42452410093).
+The Windows hardware screen is the next checkpoint.
 
 ```sh
 python3 tests/windows-checks.py
@@ -29,6 +30,21 @@ The manual `Lavender Windows PE` Actions workflow produces
 `out/windows-winpe/lavender-winpe.img` with checked manifests. Upstream Lavender
 reports WinPE CPU/display support; full Windows storage/input integration follows
 a local WinPE boot result.
+
+Downloaded and SHA-verified test image:
+`out/windows-ci/windows-winpe/lavender-winpe.img`, 270,159,872 bytes (257.6 MiB),
+SHA-256 `4356b3222dea535a44c6afa2576eb1c6c87ad73dde72976dd2f06e084df6a66a`.
+
+```sh
+fastboot boot out/windows-ci/windows-winpe/lavender-winpe.img
+```
+
+The menu starts `Windows 10 ARM64: WinPE RAM boot` after ten seconds. The next
+device record must capture the final Windows/logo/error/console screen.
+
+On confirmed `lavender`, the 270,159,872-byte image was temporarily RAM-booted:
+download OKAY (8.190 s), boot OKAY (0.143 s), total 9.861 s. The image/firmware
+checks pass; Windows kernel/userland execution is awaiting the screen photo.
 
 ## Saved UEFI/iOS bring-up record
 
